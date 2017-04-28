@@ -9,7 +9,7 @@
 import SpriteKit
 import GameplayKit
 
-class GameScene: SKScene {
+class GameScene: SKScene, SKPhysicsContactDelegate {
     
     //MARK: - Variables locales
     var background = SKSpriteNode()
@@ -19,18 +19,53 @@ class GameScene: SKScene {
     var limitLand = SKNode()
     var timer = Timer()
     
+    //grupo de colisiones
+    let birdGroup : UInt32 = 1
+    let objectGroup : UInt32 = 2
+    let gapGroup : UInt32 = 4
+    let movingGroup = SKNode()
+    
+    
+    //grupo de los labels
+    var score = 0
+    var scoreLabel = SKLabelNode()
+    var gameOverLabel = SKLabelNode()
+    var gameOver = false
+    
+    
     override func didMove(to view: SKView) {
+        
+        self.physicsWorld.contactDelegate = self
+        self.physicsWorld.gravity = CGVector(dx: 0, dy: -5.0)
+        self.addChild(movingGroup)
         
         makeLimitLand()
         makeBird()
         makeBackground()
         makeLoopPipe1AndPipe2()
+        makeLabel()
         
     }
     
+    func didBegin(_ contact: SKPhysicsContact) {
+        if contact.bodyA.categoryBitMask == gapGroup || contact.bodyB.categoryBitMask == gapGroup{
+            score += 1
+            scoreLabel.text = "\(score)"
+        }else if !gameOver{
+            gameOver = true
+            movingGroup.speed = 0
+            timer.invalidate()
+            makeLabelGameOver()
+        }
+    }
+    
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        bird.physicsBody?.velocity = CGVector(dx: 0, dy: 0)
-        bird.physicsBody?.applyImpulse(CGVector(dx: 0, dy: 70))
+        if !gameOver{
+            bird.physicsBody?.velocity = CGVector(dx: 0, dy: 0)
+            bird.physicsBody?.applyImpulse(CGVector(dx: 0, dy: 70))
+        }else{
+            resetGame()
+        }
     }
     
     
@@ -45,6 +80,7 @@ class GameScene: SKScene {
         limitLand.position = CGPoint(x: -(self.frame.width/2), y: -(self.frame.height/2))
         limitLand.physicsBody = SKPhysicsBody(rectangleOf: CGSize(width: self.frame.width, height: 1))
         limitLand.physicsBody?.isDynamic = false
+        limitLand.physicsBody?.categoryBitMask = objectGroup
         limitLand.zPosition = 2
         self.addChild(limitLand)
     }
@@ -62,7 +98,7 @@ class GameScene: SKScene {
             background.zPosition = 0
             background.size.height = self.frame.height
             background.run(moveBackgroundForever)
-            self.addChild(background)
+            self.movingGroup.addChild(background)
         }
         
     }
@@ -92,6 +128,12 @@ class GameScene: SKScene {
         bird.physicsBody = SKPhysicsBody(texture: birdTexture1, alphaThreshold: 0.5, size: CGSize(width: bird.size.width, height: bird.size.height))
         
         bird.physicsBody?.isDynamic = true
+        
+        bird.physicsBody?.categoryBitMask = birdGroup
+        bird.physicsBody?.collisionBitMask = objectGroup
+        bird.physicsBody?.contactTestBitMask = objectGroup | gapGroup
+        
+        
         bird.physicsBody?.allowsRotation = false
         
         
@@ -111,29 +153,94 @@ class GameScene: SKScene {
         let pipeOffset = CGFloat(movementAmount) - self.frame.height / 4
         
         //mover la tubería
-        let movePipes = SKAction.moveBy(x: -self.frame.width, y: 0, duration: TimeInterval(self.frame.width / 200))
+        let movePipes = SKAction.moveBy(x: -self.frame.width - 600, y: 0, duration: TimeInterval(self.frame.width / 200))
         let removePipes = SKAction.removeFromParent()
         let moveAndRemovePipes = SKAction.sequence([movePipes, removePipes])
         
         //creamos el pipe arriba
         let pipetexture1 = SKTexture(imageNamed: "pipe1")
         pipeFinal1 = SKSpriteNode(texture: pipetexture1)
-        pipeFinal1.position = CGPoint(x: self.frame.width / 2, y: (pipeFinal1.size.height / 2) + (gapHeight / 2) + pipeOffset)
+        pipeFinal1.position = CGPoint(x: (self.frame.width / 2) + pipeFinal1.size.width, y: (pipeFinal1.size.height / 2) + (gapHeight / 2) + pipeOffset)
         pipeFinal1.physicsBody = SKPhysicsBody(rectangleOf: pipeFinal1.size)
         pipeFinal1.physicsBody?.isDynamic = false
+        pipeFinal1.physicsBody?.categoryBitMask = objectGroup
         pipeFinal1.zPosition = 4
         pipeFinal1.run(moveAndRemovePipes)
-        self.addChild(pipeFinal1)
+        self.movingGroup.addChild(pipeFinal1)
         
+        //creamos el pipe arriba
+        let pipetexture2 = SKTexture(imageNamed: "pipe2")
+        pipeFinal2 = SKSpriteNode(texture: pipetexture2)
+        pipeFinal2.position = CGPoint(x: (self.frame.width / 2) + pipeFinal2.size.width, y: -(pipeFinal2.size.height / 2) - (gapHeight / 2) + pipeOffset)
+        pipeFinal2.physicsBody = SKPhysicsBody(rectangleOf: pipeFinal2.size)
+        pipeFinal2.physicsBody?.isDynamic = false
+        pipeFinal2.physicsBody?.categoryBitMask = objectGroup
+        pipeFinal2.zPosition = 4
+        pipeFinal2.run(moveAndRemovePipes)
+        self.movingGroup.addChild(pipeFinal2)
+        
+        
+        makeGapNode(pipeOffset, gapHeight: gapHeight, moveAndRemovePipes: moveAndRemovePipes)
+        
+    }
+    
+    func makeGapNode(_ pipeOffset : CGFloat, gapHeight : CGFloat, moveAndRemovePipes : SKAction){
+        let gap = SKNode()
+        gap.position = CGPoint(x: (self.frame.width / 2) + pipeFinal1.size.width, y: pipeOffset)
+        gap.physicsBody = SKPhysicsBody(rectangleOf: CGSize(width: pipeFinal2.size.width, height: gapHeight))
+        gap.physicsBody?.isDynamic = false
+        gap.run(moveAndRemovePipes)
+        gap.zPosition = 7
+        gap.physicsBody?.categoryBitMask = gapGroup
+        self.movingGroup.addChild(gap)
     }
     
     func makeLoopPipe1AndPipe2(){
         
-        timer = Timer.scheduledTimer(timeInterval: 2, target: self, selector: #selector(makePipeFinal), userInfo: nil, repeats: true)
-        
+        timer = Timer.scheduledTimer(timeInterval: 3, target: self, selector: #selector(makePipeFinal), userInfo: nil, repeats: true)
         
         
     }
+    
+    
+    
+    func makeLabel(){
+        scoreLabel.fontName = "Helvetica"
+        scoreLabel.fontSize = 60
+        scoreLabel.text = "0"
+        scoreLabel.position = CGPoint(x: 0, y: self.frame.height / 2 - 90)
+        scoreLabel.zPosition = 10
+        self.addChild(scoreLabel)
+        
+      
+    }
+    
+    func makeLabelGameOver(){
+        gameOverLabel.fontName = "Helvetica"
+        gameOverLabel.fontSize = 30
+        gameOverLabel.text = "GAME OVER :("
+        gameOverLabel.position = CGPoint(x: 0, y: 0)
+        gameOverLabel.zPosition = 11
+        self.addChild(gameOverLabel)
+        
+        
+    }
+    
+    func resetGame(){
+        score = 0
+        scoreLabel.text = "0"
+        movingGroup.removeAllChildren()
+        makeBackground()
+        makeLoopPipe1AndPipe2()
+        bird.position = CGPoint(x: 0, y: 0)
+        bird.physicsBody?.velocity = CGVector(dx: 0, dy: 0)
+        gameOverLabel.removeFromParent()
+        movingGroup.speed = 1
+        gameOver = false
+    }
+    
+    
+    
     
     
 }

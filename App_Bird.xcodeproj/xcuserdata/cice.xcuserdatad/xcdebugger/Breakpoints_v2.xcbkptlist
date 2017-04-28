@@ -10,11 +10,11 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "App_Bird/GameScene.swift"
-            timestampString = "515085227.59253"
+            timestampString = "515092599.749571"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "110"
-            endingLineNumber = "110"
+            startingLineNumber = "153"
+            endingLineNumber = "153"
             landmarkName = "makePipeFinal()"
             landmarkType = "7">
          </BreakpointContent>
